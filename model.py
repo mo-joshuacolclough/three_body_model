@@ -41,12 +41,22 @@ def g(P):
 
 
 class State:
-    def __init__(self, Q_0, P_0):
+    def __init__(self, Q_0=np.ones((2, 2)), P_0=np.zeros((2, 2))):
         self.Q = Q_0
         self.P = P_0
 
     def __repr__(self):
         return "State(Q: {%s}, P: {%s})" % (self.Q, self.P)
+
+    def set_from_vector(self, vec):
+        self.Q = np.array([
+            [*vec[0:2]],
+            [*vec[2:4]]
+        ])
+        self.P = np.array([
+            [*vec[4:6]],
+            [*vec[6:8]]
+        ])
 
     def to_vector(self):
         return np.concatenate((self.Q.flatten(), self.P.flatten())).T
@@ -54,6 +64,23 @@ class State:
         return self.Q
     def get_P(self):
         return self.P
+
+    def q_s(self):
+        # Assuming Q2 - COM of solar system - is [0, 0]
+        """
+        Sun position
+        """
+        return self.Q[0] * (M_e + M_m)/M_tot
+    def q_e(self):
+        """
+        Earth position
+        """
+        return -(M_s/M_tot) * self.Q[0] - self.Q[1] * M_m/(M_e + M_m)
+    def q_m(self):
+        """
+        Moon position
+        """
+        return -(M_s/M_tot) * self.Q[0] + self.Q[1] * M_e/(M_e + M_m)
 
 
 class Model:
@@ -116,31 +143,27 @@ class Model:
         x_vec = x.to_vector()
         print("X SHAPE: ", x_vec.shape)
 
-        return np.matmul(M, x_vec)
+        state_out = State()
+        state_out.set_from_vector(np.matmul(M, x_vec))
+        return state_out, M
 
-    def step_AD(self, x, M=None):
+    def step_AD(self, x, M):
         """
-        Adjoint step. M is optional in case it's already computed from linear run.
+        Adjoint step.
         """
-        if M == None:
-            M = self.__calc_M(x)
         x_vec = x.to_vector()
-
-        return np.matmul(M.T, x_vec)
-
-    def finalise(self):  # Save to file?
-        pass
-
+        state_out = State()
+        state_out.set_from_vector(np.matmul(M.T, x_vec))
+        return state_out
 
 
 if __name__ == "__main__":
     m = Model(0.1)
-    Q_start = np.array([[0.1, 0.1], [1.0, 1.0]])
-    P_start = np.zeros((2, 2))
+    Q_start = np.array([[0.9, 0.0], [0.0, 0.201843]])
+    P_start = np.array([[0.0829942, 0.0], [0.0, 0.0884979]])
 
     x0 = State(Q_start, P_start)
 
-    x1 = m.step(x0)
     print("x: ", x0)
     print("x stepped: ", x1)
 
